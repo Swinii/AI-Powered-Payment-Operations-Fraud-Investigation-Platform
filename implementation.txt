@@ -1,0 +1,70 @@
+merchant transaction api
+
+Node.js Express postgreSQL
+
+You need to build an API that allows:
+
+Merchant
+POST   /merchants ------------ insert merchant
+GET    /merchants/:id --------get merchant details by merchant_id
+GET    /merchants  ------- get all mercahnts
+DELETE /merchants/:id  -------- remove that merchant
+Transaction
+POST   /transactions 
+GET    /transactions/:id
+GET    /merchants/:id/transactions 
+
+what tables I need ? -- merchant , transaction 
+
+We have to decide the tables and their schema . Suppose we have merchant table which stores
+merchant details like name,mail,merchant_id(unique), vpa_id (tied to merchants's 
+business called merchant account ) , created_at
+
+transaction table -- transaction_id(unique), amount ,mercahant_id , status , created_at
+
+First insert a merchant .. if duplicate try to insert using same vpa_id then return 
+merchant already exist . then delete . 
+transaction ---Even if we delete the merchant , transaction details can stay
+
+tables -- indexing is done -- Quick lookups for a merchant's transaction history sorted by date
+                               CREATE INDEX idx_transactions_merchant_date 
+                               ON transactions (merchant_id, created_at DESC);
+                                
+                             SELECT * FROM transactions 
+                             WHERE merchant_id = 'some-uuid' 
+                             ORDER BY created_at DESC 
+                             LIMIT 10;        ------------------------------when merchant wants to see recent transactions
+ 
+                              
+                              
+                              
+                              
+                              
+                           *  * *created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP???
+                                               (TIMESTAMPTZ)*
+                              India is 5.30 hrs ahead of UTC so 12.pm IST - 5.30 hrs = 6.30 AM UTC
+                              When people in India are having their lunch at 12:00 PM, the sun hasn't 
+                              fully risen in London yet, so their clocks show 6:30 AM.
+
+                              Newyork (12.00 pm EST + 5 hrs = 5 pm UTC)
+
+
+
+1.merchant
+CREATE TABLE merchants (
+    merchant_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+2.transaction
+CREATE TABLE transactions (
+    transaction_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    merchant_id UUID NOT NULL REFERENCES merchants(merchant_id) ON DELETE RESTRICT,
+    amount NUMERIC(12, 2) NOT NULL,    -- Accurate financial decimals, max 99,999,999,999.99
+    payment_method VARCHAR(50),        -- credit_card, bank_transfer, crypto, digital_wallet
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+

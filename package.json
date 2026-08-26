@@ -1,0 +1,21 @@
+{
+  "name": "merchant-transaction-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Merchant and transaction API built with Express and PostgreSQL",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "cross-env": "^10.1.0",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "pg": "^8.13.1",
+    "redis": "^6.2.1"
+  }
+}

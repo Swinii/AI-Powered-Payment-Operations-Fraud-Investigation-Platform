@@ -1,0 +1,76 @@
+Merchant Transaction API - Quick Notes
+
+1. Where does `request` come from?
+
+Express passes `request` to every route handler. It represents the incoming HTTP request.
+
+- `request.body`: JSON data sent by the client
+- `request.params`: URL values such as `/merchants/:id`
+- `request.query`: query values such as `?limit=10`
+- `request.headers`: HTTP headers
+
+`express.json()` parses incoming JSON before the route handler uses `request.body`.
+
+2. What does `npm.cmd start` do?
+
+The `start` script in `package.json` runs:
+
+```bash
+node src/server.js
+```
+
+It starts the API normally.
+
+On Windows, `npm.cmd` is the Windows command entry point for npm. `npm start` may also work depending on the terminal configuration.
+
+3. What does `npm.cmd run dev` do?
+
+The `dev` script runs:
+
+```bash
+node --watch src/server.js
+```
+
+It starts the API in development mode and automatically restarts it when the source files change.
+
+4. What does `--watch` mean?
+
+`--watch` is a Node.js option that monitors the application files. When an imported file changes, Node restarts the server automatically. It is useful during development.
+
+5. What does `initializeDatabase()` do?
+
+```js
+async function initializeDatabase() {
+	const schema = await fs.readFile(
+		path.join(__dirname, '..', 'db', 'schema.sql'),
+		'utf8'
+	);
+	await pool.query(schema);
+}
+```
+
+It reads `db/schema.sql` as text and sends that SQL to PostgreSQL. The SQL creates the database extension, tables, constraints, and indexes. `await` makes the server wait until the file is read and the SQL finishes executing.
+
+6. Does status `201` mean Created?
+
+Yes. HTTP `201 Created` means a new resource was successfully created. This API returns it after successfully creating a merchant or transaction.
+
+7. What does `error.code === '23505'` mean?
+
+`23505` is PostgreSQL's code for a unique constraint violation. It occurs when an insert duplicates a unique value, such as an existing merchant email or `vpa_id`.
+
+The API converts that database error into:
+
+```http
+409 Conflict
+```
+
+with the response:
+
+```json
+{
+	"error": "merchant already exists"
+}
+```
+
+`409 Conflict` is appropriate because the request conflicts with data already stored in the database.
