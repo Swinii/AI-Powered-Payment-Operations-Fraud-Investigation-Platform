@@ -9,13 +9,9 @@ function summaryCacheKey(merchantId) {
 
 async function readSummaryCache(merchantId) {
   if (!redisClient.isReady) {
-    console.warn('Redis client is not ready. Skipping cache read.');
     return null;
   }
-  console.log(`-----readSummary-------Fetching summary from cache for merchant with ID: ${merchantId}`);
   const cached = await redisClient.get(summaryCacheKey(merchantId));
-  console.log("summaryCasheKey: ", summaryCacheKey(merchantId));
-  console.log(`Retrieved summary from cache for merchant with ID: ${merchantId}, cached: ${cached}`);
   return cached ? JSON.parse(cached) : null;
 }
 
@@ -32,7 +28,14 @@ async function clearSummaryCache(merchantId) {
 }
 
 async function createTransaction(input) {
-  const { merchant_id: merchantId, amount, payment_method: paymentMethod, status = 'pending' } = input;
+  const {
+    merchant_id: merchantId,
+    amount,
+    payment_method: paymentMethod,
+    status = 'pending',
+    currency = 'INR'
+  } = input;
+
   validateUuid(merchantId, 'merchant_id');
   if (!Number.isFinite(Number(amount)) || Number(amount) <= 0) {
     const error = new Error('amount must be greater than zero');
@@ -46,17 +49,31 @@ async function createTransaction(input) {
     throw error;
   }
 
-  const transaction = await transactionModel.createTransaction({ merchantId, amount, paymentMethod, status });
+  const transaction = await transactionModel.createTransaction({
+    merchantId,
+    amount,
+    paymentMethod,
+    status,
+    currency
+  });
+
   await clearSummaryCache(merchantId);
+
+  // Trigger background fraud screening
+  try {
+    const { autoScreenTransaction } = require('./fraud.service');
+    autoScreenTransaction(transaction);
+  } catch (err) {
+    console.error('Auto-screen trigger error:', err.message);
+  }
+
   return transaction;
 }
 
 async function getTransaction(transactionId) {
   validateUuid(transactionId, 'transaction id');
-  console.log(`Fetching transaction with ID: ${transactionId}`);
   const transaction = await transactionModel.findTransactionById(transactionId);
   if (!transaction) {
-    console.log(`Transaction with ID: ${transactionId} not found`);
     const error = new Error('transaction not found');
     error.statusCode = 404;
     throw error;
@@ -66,35 +83,26 @@ async function getTransaction(transactionId) {
 
 async function listMerchantTransactions(merchantId, requestedLimit) {
   validateUuid(merchantId, 'merchant id');
-  console.log(`Fetching transactions for merchant with ID: ${merchantId}`);
   const limit = Math.min(Math.max(Number(requestedLimit) || 10, 1), 100);
   return transactionModel.findTransactionsByMerchant(merchantId, limit);
 }
 
 async function getMerchantSummary(merchantId) {
   validateUuid(merchantId, 'merchant id');
-  console.log(`----getMerchantSummary---check merchant ID: ${merchantId}`);
   const merchant = await merchantModel.findMerchantById(merchantId);
   if (!merchant) {
-    console.log(`Merchant with ID: ${merchantId} not found`);
     const error = new Error('merchant not found');
     error.statusCode = 404;
     throw error;
   }
 
   try {
-    console.log(`Fetching summary from cache for merchant with ID: ${merchantId}`);
     const cached = await readSummaryCache(merchantId);
     if (cached) {
-      console.log(`Retrieved summary from cache for merchant with ID: ${merchantId}`);
       return cached;
     }
-    console.log(`Summary not found in cache for merchant with ID: ${merchantId}`);
     const summary = await transactionModel.getMerchantSummary(merchantId);
     await writeSummaryCache(merchantId, summary);
-    console.log(`Written summary to cache for merchant with ID: ${merchantId}, summary: ${JSON
-        .stringify(summary)
-    }  `);
     return summary;
   } catch (error) {
     console.error('Redis summary cache error:', error.message);

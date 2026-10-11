@@ -5,6 +5,7 @@ const { initializeDatabase, pool } = require('./db');
 const { connectRedis } = require('./redis');
 const merchantController = require('../controller/merchant.controller');
 const transactionController = require('../controller/transaction.controller');
+const fraudController = require('../controller/fraud.controller');
 
 const app = express();
 const port = Number(process.env.PORT || 8080);
@@ -20,15 +21,25 @@ app.get('/health', async (_request, response, next) => {
   }
 });
 
+// Merchant routes
 app.post('/merchants', merchantController.create);
 app.get('/merchants', merchantController.list);
 app.get('/merchants/:id', merchantController.getById);
 app.delete('/merchants/:id', merchantController.remove);
+app.get('/merchants/:id/fraud-summary', fraudController.getMerchantSummary);
 
+// Transaction routes
 app.post('/transactions', transactionController.create);
 app.get('/transactions/:id', transactionController.getById);
 app.get('/merchants/:id/transactions', transactionController.listByMerchant);
 app.get('/merchants/:id/transactions/summary', transactionController.summaryByMerchant);
+
+// AI Fraud Investigation routes
+app.post('/transactions/:id/investigate', fraudController.investigate);
+app.get('/investigations', fraudController.list);
+app.get('/investigations/:id', fraudController.getById);
+app.patch('/investigations/:id/review', fraudController.review);
+app.get('/fraud/overview', fraudController.getOverview);
 
 app.use((_request, response) => response.status(404).json({ error: 'route not found' }));
 app.use((error, _request, response, _next) => {
